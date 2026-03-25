@@ -12,7 +12,7 @@ logger = setup_logger("voice_handlers")
 
 async def get_message_content_by_id(msg_id: int) -> str:
     """Helper to fetch exact ai completion from DB for the Show Text button."""
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute("SELECT content FROM messages WHERE id = ?", (msg_id,)) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else "Message not found."

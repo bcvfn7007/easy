@@ -5,19 +5,19 @@ from app.utils.logger import setup_logger
 
 logger = setup_logger("database")
 
-async def get_db() -> aiosqlite.Connection:
+def get_db() -> aiosqlite.Connection:
     """Gets a new database connection."""
     # config.DATABASE_URL usually starts with sqlite+aiosqlite:///
     db_path = config.DATABASE_URL.replace("sqlite+aiosqlite:///", "")
     if not db_path.endswith(".db"):
         db_path = os.path.join(config.DATA_DIR, "easy_english.db")
     
-    return await aiosqlite.connect(db_path)
+    return aiosqlite.connect(db_path)
 
 async def init_db():
     """Initializes the SQLite database tables."""
     logger.info("Initializing database...")
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
