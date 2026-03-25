@@ -59,7 +59,7 @@ def main():
     application.post_init = post_init
 
     # Start the Bot
-    application.run_polling()
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
