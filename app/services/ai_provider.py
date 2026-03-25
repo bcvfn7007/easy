@@ -11,7 +11,7 @@ CLIENT = openai.AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=config.OPENROUTER_API_KEY,
 )
-DEFAULT_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+DEFAULT_MODEL = "google/gemma-2-9b-it:free"
 
 SYSTEM_PROMPT = """
 You are 'Easy English', a highly perceptive and friendly English language tutor AI.
