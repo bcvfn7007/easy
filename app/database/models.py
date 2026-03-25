@@ -1,6 +1,7 @@
 import json
 from typing import Optional, List, Dict
 from app.database.db import get_db
+import aiosqlite
 from app.utils.logger import setup_logger
 
 logger = setup_logger("db_models")

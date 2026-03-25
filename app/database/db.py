@@ -12,7 +12,7 @@ def get_db() -> aiosqlite.Connection:
     if not db_path.endswith(".db"):
         db_path = os.path.join(config.DATA_DIR, "easy_english.db")
     
-    return aiosqlite.connect(db_path)
+    return aiosqlite.connect(db_path, timeout=15.0)
 
 async def init_db():
     """Initializes the SQLite database tables."""

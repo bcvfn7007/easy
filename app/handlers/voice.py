@@ -98,8 +98,7 @@ async def show_text_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Re-sending the original AI text response below the audio is cleaner because voice messages can't easily have long captions
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"📝 *Transcript:*\n{content}",
-                parse_mode="Markdown",
+                text=f"📝 Transcript:\n{content}",
                 reply_to_message_id=query.message.message_id
             )
             # Remove the button so they don't click it again
