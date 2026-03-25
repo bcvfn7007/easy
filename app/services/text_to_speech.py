@@ -5,6 +5,7 @@ from pydub import AudioSegment
 from app.config.settings import config
 from app.utils.logger import setup_logger
 import uuid
+import re
 
 logger = setup_logger("text_to_speech")
 
@@ -25,7 +26,9 @@ async def generate_speech(text: str, user_id: int) -> str:
         
     try:
         def _synthesize():
-            tts = gTTS(text=text, lang="en", slow=False)
+            # Smart language detection for voice reading
+            lang = "ru" if re.search(r'[А-Яа-я]', text) else "en"
+            tts = gTTS(text=text, lang=lang, slow=False)
             tts.save(mp3_path)
             
             # Telegram requires OGG OPUS for voice notes specifically.
