@@ -11,7 +11,7 @@ from app.handlers import (
     handle_voice_message, show_text_callback
 )
 from app.admin import (
-    admin_command, stats_command, broadcast_command,
+    admin_command, admin_callbacks, stats_command, broadcast_command,
     ban_command, unban_command, toggle_ai_command, toggle_voice_command,
     grant_pro_command, toggle_monetization_command
 )
@@ -52,6 +52,7 @@ def main():
     
     # Callback Handlers
     application.add_handler(CallbackQueryHandler(show_text_callback, pattern=r"^show_txt_.*"))
+    application.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^admin_.*"))
 
     # Since we can't easily use await inside synchronous main without altering PTB loop behavior, 
     # we tie our database initialization to post_init hook.

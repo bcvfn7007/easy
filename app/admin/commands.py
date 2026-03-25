@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from app.database import models
 from app.config.settings import config
@@ -16,21 +16,45 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(user_id):
         return await update.message.reply_text("You do not have permission to use this command.")
 
-    # In a fully fleshed out version, this could return an InlineKeyboard
-    # For now, we list the commands available to the admin
     panel_text = (
         "🔐 *Admin Panel*\n\n"
-        "Available commands:\n"
+        "Click a button below or use these commands directly:\n"
         "/stats - View bot statistics\n"
-        "/broadcast <message> - Send a message to all users\n"
-        "/ban <user_id> - Ban a user (revoke AI/Voice access)\n"
-        "/unban <user_id> - Unban a user\n"
-        "/toggle_ai <user_id> - Enable/disable AI for user\n"
-        "/toggle_voice <user_id> - Enable/disable Voice for user\n"
-        "/toggle_monetization - Enable/disable monetization system globally\n"
-        "/grant_pro <user_id> - Grant Pro status to a user"
+        "/broadcast [message] - Send a message to all users\n"
+        "/ban [user_id] - Ban a user (revoke voice & ai)\n"
+        "/unban [user_id] - Unban a user\n"
+        "/toggle_ai [user_id] - Toggle AI for user\n"
+        "/toggle_voice [user_id] - Toggle Voice for user\n"
+        "/toggle_monetization - Toggle global monetization\n"
+        "/grant_pro [user_id] - Grant Pro status"
     )
-    await update.message.reply_text(panel_text, parse_mode="Markdown")
+    
+    keyboard = [
+        [InlineKeyboardButton("📊 View Statistics", callback_data="admin_stats")],
+        [InlineKeyboardButton("💰 Toggle Monetization", callback_data="admin_monetization")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(panel_text, reply_markup=reply_markup, parse_mode="Markdown")
+
+async def admin_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles admin panel button clicks."""
+    query = update.callback_query
+    await query.answer()
+    
+    if not is_admin(update.effective_user.id):
+        return
+        
+    if query.data == "admin_stats":
+        users = await models.get_all_users()
+        await query.message.reply_text(f"📊 *Statistics*\n\n👥 Total Users: {len(users)}", parse_mode="Markdown")
+    elif query.data == "admin_monetization":
+        current_setting = await models.get_global_setting("monetization", "false")
+        new_val = "true" if current_setting == "false" else "false"
+        await models.set_global_setting("monetization", new_val)
+        config.MONETIZATION_ENABLED = (new_val == "true")
+        status = "enabled" if new_val == "true" else "disabled"
+        await query.message.reply_text(f"Global monetization feature {status}.")
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id): return
