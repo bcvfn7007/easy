@@ -4,6 +4,7 @@ from openai import AsyncOpenAI
 import speech_recognition as sr
 from app.config.settings import config
 from app.utils.logger import setup_logger
+from pydub import AudioSegment
 import asyncio
 
 logger = setup_logger("speech_to_text")
@@ -38,20 +39,34 @@ async def transcribe_audio(file_path: str) -> str:
             logger.error(f"Whisper STT failed: {e}")
             return ""
             
+    # Convert OGG to WAV for speech_recognition fallback
+    wav_path = file_path
+    if file_path.endswith(".ogg") and not (WHISPER_API_KEY and WHISPER_API_URL):
+        wav_path = file_path.replace(".ogg", ".wav")
+        try:
+            def _convert():
+                audio = AudioSegment.from_ogg(file_path)
+                audio.export(wav_path, format="wav")
+            await asyncio.to_thread(_convert)
+        except Exception as e:
+            logger.error(f"Failed to convert OGG to WAV: {e}")
+            return ""
+
     # Fallback to free Google STT via SpeechRecognition library
     logger.info("Using free Google Speech Recognition fallback.")
     try:
-        # Pydub or similar might be needed to convert OGG to WAV if telegram sends OGG
-        # For simplicity, assuming the incoming file is WAV (converted prior)
         recognizer = sr.Recognizer()
-        
-        # We need a small wrapper because SR is blocking
         def _transcribe():
-            with sr.AudioFile(file_path) as source:
+            with sr.AudioFile(wav_path) as source:
                 audio_data = recognizer.record(source)
                 return recognizer.recognize_google(audio_data)
                 
         text = await asyncio.to_thread(_transcribe)
+        
+        # Cleanup temporary wav file to save disk space
+        if wav_path != file_path and os.path.exists(wav_path):
+            os.remove(wav_path)
+            
         return text
     except sr.UnknownValueError:
         logger.warning("Google STT could not understand audio")
