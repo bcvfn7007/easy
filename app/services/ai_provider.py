@@ -7,11 +7,19 @@ logger = setup_logger("ai_provider")
 
 # OpenRouter is OpenAI compatible.
 # meta-llama/llama-3-8b-instruct is an excellent, free open-source model available on OpenRouter.
+# Auto-detect Groq API vs OpenRouter based on key prefix
+# Groq keys start with 'gsk_' and offer blazing fast FREE Llama 3 models.
+if config.OPENROUTER_API_KEY and config.OPENROUTER_API_KEY.startswith("gsk_"):
+    _BASE_URL = "https://api.groq.com/openai/v1"
+    DEFAULT_MODEL = "llama-3.1-8b-instant"
+else:
+    _BASE_URL = "https://openrouter.ai/api/v1"
+    DEFAULT_MODEL = "google/gemma-2-9b-it:free"
+
 CLIENT = openai.AsyncOpenAI(
-    base_url="https://openrouter.ai/api/v1",
+    base_url=_BASE_URL,
     api_key=config.OPENROUTER_API_KEY,
 )
-DEFAULT_MODEL = "google/gemma-2-9b-it:free"
 
 SYSTEM_PROMPT = """
 You are 'Easy English', a highly perceptive and friendly English language tutor AI.
