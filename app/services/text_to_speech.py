@@ -1,0 +1,39 @@
+import os
+import asyncio
+from gtts import gTTS
+from app.config.settings import config
+from app.utils.logger import setup_logger
+import uuid
+
+logger = setup_logger("text_to_speech")
+
+async def generate_speech(text: str, user_id: int) -> str:
+    """
+    Converts text to speech using gTTS.
+    Saves the file to the data directory and returns the file path.
+    """
+    if not text:
+        return ""
+        
+    # generate a unique filename
+    output_filename = f"reply_{user_id}_{uuid.uuid4().hex[:8]}.mp3"
+    output_path = os.path.join(config.DATA_DIR, output_filename)
+        
+    try:
+        def _synthesize():
+            tts = gTTS(text=text, lang="en", slow=False)
+            tts.save(output_path)
+            
+        await asyncio.to_thread(_synthesize)
+        return output_path
+    except Exception as e:
+        logger.error(f"gTTS error: {e}")
+        return ""
+        
+async def cleanup_audio_file(file_path: str):
+    """Utility to remove the audio file after sending."""
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        logger.warning(f"Could not delete audio file {file_path}: {e}")
