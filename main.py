@@ -1,14 +1,16 @@
 import asyncio
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
-    filters, CallbackQueryHandler
+    filters, CallbackQueryHandler, PreCheckoutQueryHandler
 )
 from app.config.settings import config
 from app.database.db import init_db
 from app.utils.logger import setup_logger
 from app.handlers import (
     start_command, help_command, handle_text_message,
-    handle_voice_message, show_text_callback
+    handle_voice_message, show_text_callback,
+    settings_command, settings_callbacks,
+    send_invoice_callback, precheckout_callback, successful_payment_callback
 )
 from app.admin import (
     admin_command, admin_callbacks, stats_command, broadcast_command,
@@ -34,6 +36,7 @@ def main():
     # Base Handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("settings", settings_command))
 
     # Admin Handlers
     application.add_handler(CommandHandler("admin", admin_command))
@@ -53,6 +56,12 @@ def main():
     # Callback Handlers
     application.add_handler(CallbackQueryHandler(show_text_callback, pattern=r"^show_txt_.*"))
     application.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^admin_.*"))
+    application.add_handler(CallbackQueryHandler(settings_callbacks, pattern=r"^set_lang_"))
+    application.add_handler(CallbackQueryHandler(send_invoice_callback, pattern=r"^buy_pro$"))
+    
+    # Payments
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
 
     # Since we can't easily use await inside synchronous main without altering PTB loop behavior, 
     # we tie our database initialization to post_init hook.

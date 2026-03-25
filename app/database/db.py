@@ -50,5 +50,13 @@ async def init_db():
             )
         ''')
         
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id INTEGER PRIMARY KEY,
+                tts_language TEXT DEFAULT 'auto',
+                FOREIGN KEY(user_id) REFERENCES users(user_id)
+            )
+        ''')
+        
         await db.commit()
     logger.info("Database initialized successfully.")

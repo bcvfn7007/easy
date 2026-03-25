@@ -29,8 +29,13 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Save user message
     await models.add_message_to_history(user_id, 'user', user_text)
     
-    # Retrieve history
-    history = await models.get_message_history(user_id, limit=6) # Get last 6 interactions
+    # Check trial and pro status
+    trial_active = await models.is_trial_active(user_id)
+    is_pro = bool(user.get("is_pro")) if user else False
+    
+    # Retrieve history (Limit context memory for expired free users)
+    history_limit = 6 if (is_pro or trial_active) else 2
+    history = await models.get_message_history(user_id, limit=history_limit) # Get last 6 interactions
     
     # Ask AI provider for reply
     ai_reply = await ai_provider.generate_response(user_id, history, user_text)

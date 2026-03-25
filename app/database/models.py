@@ -82,3 +82,33 @@ async def get_global_setting(key: str, default: str = None) -> Optional[str]:
         async with db.execute("SELECT value FROM settings WHERE key = ?", (key,)) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else default
+
+async def is_trial_active(user_id: int) -> bool:
+    """Returns True if the user created their account within the last 10 days."""
+    async with get_db() as db:
+        async with db.execute("SELECT (julianday('now') - julianday(joined_at)) FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row and row[0] is not None:
+                return row[0] <= 10.0
+            return True # fallback on null
+
+async def get_user_setting(user_id: int, key: str, default: str = 'auto') -> str:
+    """Gets a specific user setting like tts_language."""
+    async with get_db() as db:
+        try:
+            async with db.execute(f"SELECT {key} FROM user_settings WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else default
+        except aiosqlite.OperationalError:
+            return default # column might not exist
+
+async def set_user_setting(user_id: int, key: str, value: str) -> None:
+    """Sets a user setting."""
+    async with get_db() as db:
+        # SQLite UPSERT syntax
+        await db.execute(f'''
+            INSERT INTO user_settings (user_id, {key}) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET {key} = excluded.{key}
+        ''', (user_id, value))
+        await db.commit()
+

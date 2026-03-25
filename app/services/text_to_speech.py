@@ -9,7 +9,7 @@ import re
 
 logger = setup_logger("text_to_speech")
 
-async def generate_speech(text: str, user_id: int) -> str:
+async def generate_speech(text: str, user_id: int, override_lang: str = "auto") -> str:
     """
     Converts text to speech using gTTS.
     Saves the file to the data directory and returns the file path.
@@ -27,7 +27,10 @@ async def generate_speech(text: str, user_id: int) -> str:
     try:
         def _synthesize():
             # Smart language detection for voice reading
-            lang = "ru" if re.search(r'[А-Яа-я]', text) else "en"
+            if override_lang in ["en", "ru"]:
+                lang = override_lang
+            else:
+                lang = "ru" if re.search(r'[А-Яа-я]', text) else "en"
             tts = gTTS(text=text, lang=lang, slow=False)
             tts.save(mp3_path)
             

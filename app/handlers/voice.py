@@ -62,29 +62,41 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # Save bot reply and get the msg_id for the callback!
     msg_id = await models.add_message_to_history(user_id, 'assistant', ai_reply)
 
-    # Step 3: TTS
-    tts_audio_path = await text_to_speech.generate_speech(ai_reply, user_id)
+    # Check trial and pro status
+    trial_active = await models.is_trial_active(user_id)
+    is_pro = bool(user.get("is_pro")) if user else False
     
-    if not tts_audio_path:
-        # Fallback to Text if TTS fails
-        return await update.message.reply_text(f"*(Audio generation failed)*\n\n{ai_reply}", parse_mode="Markdown")
+    # Step 3: TTS
+    if is_pro or trial_active:
+        user_lang_pref = await models.get_user_setting(user_id, "tts_language", "auto")
+        tts_audio_path = await text_to_speech.generate_speech(ai_reply, user_id, user_lang_pref)
         
-    # Send Voice with "Show Text" Button
-    keyboard = [[InlineKeyboardButton("💬 Show Text", callback_data=f"show_txt_{msg_id}")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        if not tts_audio_path:
+            # Fallback to Text if TTS fails
+            return await update.message.reply_text(f"*(Audio generation failed)*\n\n{ai_reply}", parse_mode="Markdown")
+            
+        # Send Voice with "Show Text" Button
+        keyboard = [[InlineKeyboardButton("💬 Show Text", callback_data=f"show_txt_{msg_id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    try:
-        with open(tts_audio_path, 'rb') as audio_payload:
-            await update.message.reply_voice(
-                voice=audio_payload,
-                reply_markup=reply_markup
-            )
-    except Exception as e:
-        logger.error(f"Failed to send voice payload: {e}")
-        await update.message.reply_text("There was an error sending the audio back to you.", parse_mode="Markdown")
-    finally:
-        # Step 4: Cleanup File
-        await text_to_speech.cleanup_audio_file(tts_audio_path)
+        try:
+            with open(tts_audio_path, 'rb') as audio_payload:
+                await update.message.reply_voice(
+                    voice=audio_payload,
+                    reply_markup=reply_markup
+                )
+        except Exception as e:
+            logger.error(f"Failed to send voice payload: {e}")
+            await update.message.reply_text("There was an error sending the audio back to you.", parse_mode="Markdown")
+        finally:
+            # Step 4: Cleanup File
+            await text_to_speech.cleanup_audio_file(tts_audio_path)
+    else:
+        # Fallback to Text for expired free users
+        keyboard = [[InlineKeyboardButton("⭐ Upgrade to PRO to hear voice", callback_data="buy_pro")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        msg_text = f"*(Trial Expired: Voice Replies Disabled)*\n\n{ai_reply}"
+        await update.message.reply_text(msg_text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
 async def show_text_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
