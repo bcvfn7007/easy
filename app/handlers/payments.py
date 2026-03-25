@@ -5,15 +5,7 @@ from app.utils.logger import setup_logger
 
 logger = setup_logger("payments")
 
-async def send_invoice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Callback triggered by the '⭐ Upgrade to PRO' inline button."""
-    query = update.callback_query
-    await query.answer()
-    
-    if query.data != "buy_pro":
-        return
-        
-    chat_id = update.effective_chat.id
+async def send_pro_invoice_to_user(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     title = "Easy English PRO"
     description = "Unlimited Voice Assistant replies and advanced conversational AI memory. Pay securely with Telegram Stars."
     payload = "pro_sub_payload"
@@ -34,6 +26,16 @@ async def send_invoice_callback(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         logger.error(f"Failed to send XTR invoice: {e}")
         await context.bot.send_message(chat_id, "Error generating invoice. Please try again later.")
+
+async def send_invoice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback triggered by the '⭐ Upgrade to PRO' inline button."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data != "buy_pro":
+        return
+        
+    await send_pro_invoice_to_user(context, update.effective_chat.id)
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Answers the PreCheckoutQuery allowing payment to proceed."""

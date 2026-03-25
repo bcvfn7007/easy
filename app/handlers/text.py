@@ -11,6 +11,17 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     user_text = update.message.text
     
+    # Intercept persistent keyboard buttons
+    if user_text == "⚙️ Settings":
+        from .settings import settings_command
+        return await settings_command(update, context)
+    elif user_text == "❓ Help":
+        from .base import help_command
+        return await help_command(update, context)
+    elif user_text == "⭐ Upgrade to PRO":
+        from .payments import send_pro_invoice_to_user
+        return await send_pro_invoice_to_user(context, update.effective_chat.id)
+    
     if is_rate_limited(user_id, cooldown_seconds=3.0):
         return await update.message.reply_text("⏳ Please wait a few seconds before sending another message.")
     

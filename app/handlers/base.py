@@ -1,9 +1,17 @@
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 from app.database import models
 from app.utils.logger import setup_logger
 
 logger = setup_logger("base_handlers")
+
+def get_main_keyboard() -> ReplyKeyboardMarkup:
+    """Returns the persistent bottom keyboard for users."""
+    keyboard = [
+        ["⚙️ Settings", "❓ Help"],
+        ["⭐ Upgrade to PRO"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the /start command."""
