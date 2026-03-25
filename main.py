@@ -1,5 +1,5 @@
 import asyncio
-from telegram.qext import (
+from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     filters, CallbackQueryHandler
 )
