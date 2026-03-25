@@ -5,6 +5,7 @@ from app.database import models
 from app.services import ai_provider, speech_to_text, text_to_speech
 from app.config.settings import config
 from app.utils.logger import setup_logger
+from app.utils.rate_limiter import is_rate_limited
 import aiosqlite
 from app.database.db import get_db
 
@@ -19,6 +20,9 @@ async def get_message_content_by_id(msg_id: int) -> str:
 
 async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
+    if is_rate_limited(user_id, cooldown_seconds=5.0):
+        return await update.message.reply_text("⏳ Processing voice takes time. Please wait a bit before sending another!")
     
     # Authorization checks
     user = await models.get_user(user_id)

@@ -11,7 +11,7 @@ CLIENT = openai.AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=config.OPENROUTER_API_KEY,
 )
-DEFAULT_MODEL = "meta-llama/llama-3-8b-instruct"
+DEFAULT_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 SYSTEM_PROMPT = """
 You are 'Easy English', a highly perceptive and friendly English language tutor AI.
@@ -51,4 +51,4 @@ async def generate_response(user_id: int, history: List[Dict[str, str]], new_mes
         return reply.strip()
     except Exception as e:
         logger.error(f"OpenRouter API error: {e}")
-        return "I'm having a little trouble thinking of what to say right now. Give me a moment please."
+        return f"I'm having a little trouble thinking of what to say right now.\n\n(Debug Error: {str(e)})"

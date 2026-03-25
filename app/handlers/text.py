@@ -3,12 +3,16 @@ from telegram.ext import ContextTypes
 from app.database import models
 from app.services import ai_provider
 from app.utils.logger import setup_logger
+from app.utils.rate_limiter import is_rate_limited
 
 logger = setup_logger("text_handlers")
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
+    
+    if is_rate_limited(user_id, cooldown_seconds=3.0):
+        return await update.message.reply_text("⏳ Please wait a few seconds before sending another message.")
     
     # Check if user exists and is allowed to use AI
     user = await models.get_user(user_id)
