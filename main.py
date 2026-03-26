@@ -8,7 +8,7 @@ from app.database.db import init_db
 from app.utils.logger import setup_logger
 from app.handlers import (
     start_command, help_command, handle_text_message,
-    handle_voice_message,
+    handle_voice_message, show_text_callback,
     settings_command, settings_callbacks,
     send_invoice_callback, precheckout_callback, successful_payment_callback
 )

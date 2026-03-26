@@ -59,18 +59,15 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
     ai_reply = await ai_service.generate_response(user_id, history, transcription, grammar_level)
     
-    # Save bot reply
-    await models.add_message_to_history(user_id, 'assistant', ai_reply)
+    # Save bot reply and get msg_id for the Show Text button lookup
+    msg_id = await models.add_message_to_history(user_id, 'assistant', ai_reply)
 
     # Check trial and pro status
     trial_active = await models.is_trial_active(user_id)
     is_pro = bool(user.get("is_pro")) if user else False
     
-    # Step 3: Send Text Message (always) and generate TTS
+    # Step 3: Generate TTS
     if is_pro or trial_active:
-        # Send full text block immediately with the Russian explanations
-        await update.message.reply_text(ai_reply)
-        
         # Only TTS the natural English conversational text!
         tts_text = extract_conversational_text(ai_reply)
         if not tts_text:
@@ -78,18 +75,51 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
             
         tts_audio_path = await tts_service.generate_speech(tts_text, user_id, "en")  # Hardware enforced to 'en'
         
-        # Send Voice
+        # Send Voice with Show Text Button
         if tts_audio_path:
+            keyboard = [[InlineKeyboardButton("💬 Show Text", callback_data=f"show_txt_{msg_id}")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
             try:
                 with open(tts_audio_path, 'rb') as audio_payload:
-                    await update.message.reply_voice(voice=audio_payload)
+                    await update.message.reply_voice(voice=audio_payload, reply_markup=reply_markup)
             except Exception as e:
                 logger.error(f"Failed to send voice payload: {e}")
             finally:
                 await cleanup_audio_file(tts_audio_path)
+        else:
+            await update.message.reply_text(ai_reply)
     else:
         # Fallback to Text for expired free users
         keyboard = [[InlineKeyboardButton("⭐ Upgrade to PRO to hear voice", callback_data="buy_pro")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         msg_text = f"*(Trial Expired: Voice Replies Disabled)*\n\n{ai_reply}"
         await update.message.reply_text(msg_text, reply_markup=reply_markup, parse_mode="Markdown")
+
+async def get_message_content_by_id(msg_id: int) -> str:
+    """Helper to fetch exact ai completion from DB for the Show Text button."""
+    async with get_db() as db:
+        async with db.execute("SELECT content FROM messages WHERE id = ?", (msg_id,)) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else "Message not found."
+
+async def show_text_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles callback for 'Show Text' button on voice messages."""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    if data.startswith("show_txt_"):
+        try:
+            msg_id = int(data.replace("show_txt_", ""))
+            content = await get_message_content_by_id(msg_id)
+            
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=content,
+                reply_to_message_id=query.message.message_id
+            )
+            # Remove the button so they don't click it again
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception as e:
+            logger.error(f"Callback error: {e}")
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Could not retrieve transcript.")
