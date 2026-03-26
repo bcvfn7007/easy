@@ -139,3 +139,44 @@ async def update_user_grammar_level(user_id: int, level: str) -> None:
         await db.execute("UPDATE users SET language_level = ? WHERE user_id = ?", (level, user_id))
         await db.commit()
 
+async def add_to_vault(user_id: int, content: str) -> None:
+    """Saves a corrected rule or vocabulary to the personal vault."""
+    async with get_db() as db:
+        await db.execute("INSERT INTO vault (user_id, content) VALUES (?, ?)", (user_id, content))
+        await db.commit()
+        
+async def get_vault_items(user_id: int, limit: int = 20) -> List[str]:
+    """Retrieves vault items for a user."""
+    async with get_db() as db:
+        async with db.execute("SELECT content FROM vault WHERE user_id = ? ORDER BY added_at DESC LIMIT ?", (user_id, limit)) as cursor:
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+
+async def update_user_activity(user_id: int) -> dict:
+    """Updates last_active and manages the Daily Streak logic."""
+    async with get_db() as db:
+        async with db.execute("SELECT streak_count, DATE(last_active) == DATE('now'), DATE(last_active) == DATE('now', '-1 day') FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return {"streak": 0, "new_day": False}
+                
+            current_streak, is_today, is_yesterday = row
+            
+            new_streak = current_streak
+            new_day = False
+            
+            if is_yesterday:
+                new_streak += 1
+                new_day = True
+            elif not is_today and not is_yesterday:
+                # Streak broken or first time
+                new_streak = 1
+                new_day = True
+                
+            if new_day or new_streak == 0:
+                if new_streak == 0: new_streak = 1
+                await db.execute("UPDATE users SET streak_count = ?, last_active = CURRENT_TIMESTAMP WHERE user_id = ?", (new_streak, user_id))
+                await db.commit()
+                
+            return {"streak": new_streak, "new_day": new_day}
+

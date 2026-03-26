@@ -10,7 +10,8 @@ from app.handlers import (
     start_command, help_command, handle_text_message,
     handle_voice_message, show_text_callback,
     settings_command, settings_callbacks,
-    send_invoice_callback, precheckout_callback, successful_payment_callback
+    send_invoice_callback, precheckout_callback, successful_payment_callback,
+    save_command, vault_command
 )
 from app.admin import (
     admin_command, admin_callbacks, stats_command, broadcast_command,
@@ -37,6 +38,8 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("settings", settings_command))
+    application.add_handler(CommandHandler("save", save_command))
+    application.add_handler(CommandHandler("vault", vault_command))
 
     # Admin Handlers
     application.add_handler(CommandHandler("admin", admin_command))

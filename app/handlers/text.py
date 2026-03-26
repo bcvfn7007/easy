@@ -48,9 +48,13 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     history_limit = 6 if (is_pro or trial_active) else 2
     history = await models.get_message_history(user_id, limit=history_limit) # Get last 6 interactions
     
+    # Update Daily Streak & Stats
+    await models.update_user_activity(user_id)
+    
     # Ask AI provider for reply
     grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
-    ai_reply = await ai_service.generate_response(user_id, history, user_text, grammar_level)
+    bot_mode = await models.get_user_setting(user_id, "bot_mode", "Casual")
+    ai_reply = await ai_service.generate_response(user_id, history, user_text, grammar_level, bot_mode)
     
     # Save AI reply
     await models.add_message_to_history(user_id, 'assistant', ai_reply)

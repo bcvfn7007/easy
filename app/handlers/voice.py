@@ -54,10 +54,22 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # Save user transcription to DB history
     await models.add_message_to_history(user_id, 'user', f"[Voice Message] {transcription}")
     history = await models.get_message_history(user_id, limit=6)
+
+    # Check Streaks
+    await models.update_user_activity(user_id)
+    
+    # Calculate WPM
+    duration = update.message.voice.duration
+    word_count = len(transcription.split())
+    wpm = int((word_count / duration) * 60) if duration > 0 else 0
+    wpm_msg = f"\n\n🗣️ *Speaking Fluency:* {wpm} WPM"
     
     # Step 2: AI Response
     grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
-    ai_reply = await ai_service.generate_response(user_id, history, transcription, grammar_level)
+    bot_mode = await models.get_user_setting(user_id, "bot_mode", "Casual")
+    ai_reply = await ai_service.generate_response(user_id, history, transcription, grammar_level, bot_mode)
+    
+    ai_reply += wpm_msg
     
     # Save bot reply and get msg_id for the Show Text button lookup
     msg_id = await models.add_message_to_history(user_id, 'assistant', ai_reply)

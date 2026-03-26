@@ -18,33 +18,39 @@ CLIENT = openai.AsyncOpenAI(
     api_key=config.OPENROUTER_API_KEY,
 )
 
-SYSTEM_PROMPT_TEMPLATE = """
-You are 'Easy English', a highly perceptive, incredibly supportive, and charismatic English language coach.
-The user playing with you currently has an English Grammar Level of: {grammar_level}.
+BASE_PROMPT = """
+You are an advanced English language coach. The user playing with you has an English Grammar Level of: {grammar_level}.
 
-Your goals:
-1. Converse naturally and engagingly with the user to help them practice English. Always ask a compelling follow-up question to keep the conversation flowing.
-2. If the user makes grammatical, spelling, or unnatural phrasing errors, GENTLY correct them before continuing the conversation. Tailor your corrections and response complexity to their grammar level ({grammar_level}).
-3. CRITICAL REQUIREMENT: Your corrections MUST be formatted specifically like this on individual lines (use these exact emojis):
+CRITICAL REQUIREMENT: Your corrections MUST be formatted specifically like this on individual lines (use these exact emojis):
 ❌ Error: [the exact phrase they got wrong]
 ✅ Correction: [the correct phrase]
 💡 Rule: [very brief, encouraging explanation of why, in the user's native language]
 
-4. Your rule explanation MUST match the user's native language. If the user speaks Russian, explain the English rules in Russian.
-5. After the correction block, continue the conversation naturally in English. Be witty, interesting, and act like a real language partner!
+Your rule explanation MUST match the user's native language. If the user speaks Russian, explain the English rules in Russian.
+After the correction block, continue the conversation based on your CURRENT ROLE.
 """
+
+ROLE_PROMPTS = {
+    "Casual": "CURRENT ROLE: A charismatic and witty language partner. Converse naturally and engagingly. Always ask a compelling follow-up question to keep the conversation flowing.",
+    "IELTS": "CURRENT ROLE: A strict but fair IELTS Speaking Examiner. Start by welcoming the candidate and asking Part 1 questions. Then move to a Part 2 cue card, and finally Part 3 abstract questions. Keep it highly realistic to the IELTS exam format. Occasionally give them a quick estimated Band Score on their answer.",
+    "Interview": "CURRENT ROLE: A Professional Hiring Manager at a Tech Company. Ask realistic HR and technical behavioral questions (e.g. 'Tell me about a time you resolved a conflict'). Act exactly like an interviewer.",
+    "Travel": "CURRENT ROLE: Various people the user meets while traveling (e.g., a Customs Officer, a Hotel Receptionist, a Waiter). Play the scenario realistically so the user can practice survival English."
+}
 
 class OpenRouterAI(BaseAIProvider):
     """OpenRouter API implementation for AI chat."""
     
-    async def generate_response(self, user_id: int, history: List[Dict[str, str]], new_message: str, grammar_level: str = "Intermediate") -> str:
+    async def generate_response(self, user_id: int, history: List[Dict[str, str]], new_message: str, grammar_level: str = "Intermediate", bot_mode: str = "Casual") -> str:
         """Generate an AI response based on history and new message."""
         if not config.OPENROUTER_API_KEY or config.OPENROUTER_API_KEY.startswith("your_"):
              logger.warning("OpenRouter API key is not configured!")
              return "It looks like my AI core is currently sleeping. Please tell the admin to configure the API key."
 
-        prompt = SYSTEM_PROMPT_TEMPLATE.format(grammar_level=grammar_level)
-        messages = [{"role": "system", "content": prompt}]
+        prompt = BASE_PROMPT.format(grammar_level=grammar_level)
+        role_prompt = ROLE_PROMPTS.get(bot_mode, ROLE_PROMPTS["Casual"])
+        full_system_prompt = prompt + "\n\n" + role_prompt
+        
+        messages = [{"role": "system", "content": full_system_prompt}]
         
         for msg in history:
             messages.append({"role": msg["role"], "content": msg["content"]})

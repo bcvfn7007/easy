@@ -28,9 +28,17 @@ async def init_db():
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ai_enabled BOOLEAN DEFAULT 1,
                 voice_enabled BOOLEAN DEFAULT 1,
-                language_level TEXT DEFAULT 'Intermediate'
+                language_level TEXT DEFAULT 'Intermediate',
+                last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                streak_count INTEGER DEFAULT 0
             )
         ''')
+        
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            await db.execute("ALTER TABLE users ADD COLUMN streak_count INTEGER DEFAULT 0")
+        except aiosqlite.OperationalError:
+            pass # Columns already exist
         
         await db.execute('''
             CREATE TABLE IF NOT EXISTS messages (
@@ -58,5 +66,20 @@ async def init_db():
             )
         ''')
         
+        try:
+            await db.execute("ALTER TABLE user_settings ADD COLUMN bot_mode TEXT DEFAULT 'Casual'")
+        except aiosqlite.OperationalError:
+            pass # Column already exists
+            
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS vault (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                content TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(user_id)
+            )
+        ''')
+            
         await db.commit()
     logger.info("Database initialized successfully.")
