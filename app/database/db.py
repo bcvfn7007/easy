@@ -28,7 +28,7 @@ async def init_db():
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ai_enabled BOOLEAN DEFAULT 1,
                 voice_enabled BOOLEAN DEFAULT 1,
-                language_level TEXT DEFAULT 'unknown'
+                language_level TEXT DEFAULT 'Intermediate'
             )
         ''')
         

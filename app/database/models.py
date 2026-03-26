@@ -84,12 +84,12 @@ async def get_global_setting(key: str, default: str = None) -> Optional[str]:
             return row[0] if row else default
 
 async def is_trial_active(user_id: int) -> bool:
-    """Returns True if the user created their account within the last 10 days."""
+    """Returns True if the user created their account within the last 15 days."""
     async with get_db() as db:
         async with db.execute("SELECT (julianday('now') - julianday(joined_at)) FROM users WHERE user_id = ?", (user_id,)) as cursor:
             row = await cursor.fetchone()
             if row and row[0] is not None:
-                return row[0] <= 10.0
+                return row[0] <= 15.0
             return True # fallback on null
 
 async def get_user_setting(user_id: int, key: str, default: str = 'auto') -> str:
@@ -110,5 +110,32 @@ async def set_user_setting(user_id: int, key: str, value: str) -> None:
             INSERT INTO user_settings (user_id, {key}) VALUES (?, ?)
             ON CONFLICT(user_id) DO UPDATE SET {key} = excluded.{key}
         ''', (user_id, value))
+        await db.commit()
+
+async def get_user_stats(user_id: int) -> dict:
+    """Gets usage statistics for a user."""
+    stats = {"messages_sent": 0, "trial_days_left": 0}
+    async with get_db() as db:
+        # Get message count
+        async with db.execute("SELECT COUNT(*) FROM messages WHERE user_id = ? AND role = 'user'", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                stats["messages_sent"] = row[0]
+                
+        # Get trial days left
+        async with db.execute("SELECT (julianday('now') - julianday(joined_at)) FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row and row[0] is not None:
+                days_used = row[0]
+                stats["trial_days_left"] = max(0, 15 - int(days_used))
+            else:
+                stats["trial_days_left"] = 15
+                
+    return stats
+
+async def update_user_grammar_level(user_id: int, level: str) -> None:
+    """Updates user language/grammar level."""
+    async with get_db() as db:
+        await db.execute("UPDATE users SET language_level = ? WHERE user_id = ?", (level, user_id))
         await db.commit()
 

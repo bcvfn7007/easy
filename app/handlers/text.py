@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from app.database import models
-from app.services import ai_provider
+from app.services import ai_service
 from app.utils.logger import setup_logger
 from app.utils.rate_limiter import is_rate_limited
 
@@ -49,7 +49,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     history = await models.get_message_history(user_id, limit=history_limit) # Get last 6 interactions
     
     # Ask AI provider for reply
-    ai_reply = await ai_provider.generate_response(user_id, history, user_text)
+    grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
+    ai_reply = await ai_service.generate_response(user_id, history, user_text, grammar_level)
     
     # Save AI reply
     await models.add_message_to_history(user_id, 'assistant', ai_reply)

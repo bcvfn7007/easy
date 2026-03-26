@@ -2,7 +2,7 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from app.database import models
-from app.services import ai_provider, speech_to_text, text_to_speech
+from app.services import ai_service, stt_service, tts_service, cleanup_audio_file
 from app.config.settings import config
 from app.utils.logger import setup_logger
 from app.utils.rate_limiter import is_rate_limited
@@ -43,9 +43,9 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_chat_action(action='record_voice')
 
     # Step 1: STT
-    transcription = await speech_to_text.transcribe_audio(download_path)
+    transcription = await stt_service.transcribe_audio(download_path)
     # Cleanup original user audio
-    await text_to_speech.cleanup_audio_file(download_path)
+    await cleanup_audio_file(download_path)
     
     if not transcription:
          return await update.message.reply_text("Sorry, I couldn't hear what you said clearly. Could you try again?")
@@ -57,7 +57,8 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     history = await models.get_message_history(user_id, limit=6)
     
     # Step 2: AI Response
-    ai_reply = await ai_provider.generate_response(user_id, history, transcription)
+    grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
+    ai_reply = await ai_service.generate_response(user_id, history, transcription, grammar_level)
     
     # Save bot reply and get the msg_id for the callback!
     msg_id = await models.add_message_to_history(user_id, 'assistant', ai_reply)
@@ -69,7 +70,7 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # Step 3: TTS
     if is_pro or trial_active:
         user_lang_pref = await models.get_user_setting(user_id, "tts_language", "auto")
-        tts_audio_path = await text_to_speech.generate_speech(ai_reply, user_id, user_lang_pref)
+        tts_audio_path = await tts_service.generate_speech(ai_reply, user_id, user_lang_pref)
         
         if not tts_audio_path:
             # Fallback to Text if TTS fails
@@ -90,7 +91,7 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("There was an error sending the audio back to you.", parse_mode="Markdown")
         finally:
             # Step 4: Cleanup File
-            await text_to_speech.cleanup_audio_file(tts_audio_path)
+            await cleanup_audio_file(tts_audio_path)
     else:
         # Fallback to Text for expired free users
         keyboard = [[InlineKeyboardButton("⭐ Upgrade to PRO to hear voice", callback_data="buy_pro")]]

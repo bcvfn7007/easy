@@ -56,7 +56,7 @@ def main():
     # Callback Handlers
     application.add_handler(CallbackQueryHandler(show_text_callback, pattern=r"^show_txt_.*"))
     application.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^admin_.*"))
-    application.add_handler(CallbackQueryHandler(settings_callbacks, pattern=r"^set_lang_"))
+    application.add_handler(CallbackQueryHandler(settings_callbacks, pattern=r"^(set_lang_|set_grammar_|settings_.*)"))
     application.add_handler(CallbackQueryHandler(send_invoice_callback, pattern=r"^buy_pro$"))
     
     # Payments
