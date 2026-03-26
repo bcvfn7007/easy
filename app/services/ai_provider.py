@@ -70,24 +70,41 @@ class OpenRouterAI(BaseAIProvider):
             reply = response.choices[0].message.content.strip()
             
             import json
-            if reply.startswith("```json"):
-                reply = reply[7:-3].strip()
-            elif reply.startswith("```"):
-                reply = reply[3:-3].strip()
-                
-            try:
-                data = json.loads(reply)
-                return {
-                    "correction_short": data.get("correction_short", ""),
-                    "explanation": data.get("explanation", ""),
-                    "english_reply": data.get("english_reply", reply)
-                }
-            except json.JSONDecodeError:
+            import re
+            
+            # If AI forgot the brackets, wrap it
+            if not reply.startswith("{") and '"english_reply"' in reply:
+                reply = "{" + reply + "}"
+            
+            # Find JSON boundaries
+            match = re.search(r'\{.*\}', reply, re.DOTALL)
+            if match:
+                json_str = match.group(0)
+                try:
+                    data = json.loads(json_str)
+                    return {
+                        "correction_short": data.get("correction_short", ""),
+                        "explanation": data.get("explanation", ""),
+                        "english_reply": data.get("english_reply", reply)
+                    }
+                except json.JSONDecodeError:
+                    pass
+                    
+            # Fallback string manipulation if JSON is fundamentally broken
+            if '"english_reply"' in reply:
+                fallback = reply.split('"english_reply"')[-1]
+                fallback = fallback.replace(':', '', 1).strip().strip('"').strip('}').strip()
                 return {
                     "correction_short": "",
-                    "explanation": "",
-                    "english_reply": reply
+                    "explanation": "JSON Parse Error",
+                    "english_reply": fallback
                 }
+                
+            return {
+                "correction_short": "",
+                "explanation": "",
+                "english_reply": reply
+            }
                 
         except Exception as e:
             logger.error(f"OpenRouter API error: {e}")
