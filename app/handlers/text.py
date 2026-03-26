@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from app.database import models
 from app.services import ai_service
@@ -54,10 +54,24 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Ask AI provider for reply
     grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
     bot_mode = await models.get_user_setting(user_id, "bot_mode", "Casual")
-    ai_reply = await ai_service.generate_response(user_id, history, user_text, grammar_level, bot_mode)
     
-    # Save AI reply
-    await models.add_message_to_history(user_id, 'assistant', ai_reply)
+    ai_reply_dict = await ai_service.generate_response(user_id, history, user_text, grammar_level, bot_mode)
+    correction = ai_reply_dict.get("correction_short", "")
+    explanation = ai_reply_dict.get("explanation", "")
+    english_reply = ai_reply_dict.get("english_reply", "")
     
-    # Send to user
-    await update.message.reply_text(ai_reply)
+    # Save to history
+    msg_id = await models.add_message_to_history(
+        user_id, 'assistant', 
+        correction or "Perfect", 
+        explanation, 
+        english_reply
+    )
+    
+    # Send short correction if a mistake was made
+    if correction:
+        keyboard = [[InlineKeyboardButton("Объяснить 📋", callback_data=f"explain_{msg_id}")]]
+        await update.message.reply_text(correction, reply_markup=InlineKeyboardMarkup(keyboard))
+        
+    # Send english reply text
+    await update.message.reply_text(english_reply)

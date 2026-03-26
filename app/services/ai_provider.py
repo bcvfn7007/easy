@@ -21,13 +21,16 @@ CLIENT = openai.AsyncOpenAI(
 BASE_PROMPT = """
 You are an advanced English language coach. The user playing with you has an English Grammar Level of: {grammar_level}.
 
-CRITICAL REQUIREMENT: Your corrections MUST be formatted specifically like this on individual lines (use these exact emojis):
-❌ Error: [the exact phrase they got wrong]
-✅ Correction: [the correct phrase]
-💡 Rule: [very brief, encouraging explanation of why, in the user's native language]
+CRITICAL REQUIREMENT: You MUST respond ONLY with a valid JSON object. Do not wrap the JSON in markdown blocks.
+The JSON must have EXACTLY these three keys:
+{{
+    "correction_short": "💡 Mistake -> Correction (e.g. Can I can -> Can I use)",
+    "explanation": "Brief explanation of the grammar rule in the user's native language (e.g. Russian).",
+    "english_reply": "Your engaging, conversational reply in English based on your CURRENT ROLE."
+}}
 
-Your rule explanation MUST match the user's native language. If the user speaks Russian, explain the English rules in Russian.
-After the correction block, continue the conversation based on your CURRENT ROLE.
+If the user made no grammar mistakes, set "correction_short" and "explanation" to empty strings "".
+Your "english_reply" MUST NEVER contain grammar explanations. It should strictly be your conversational response.
 """
 
 ROLE_PROMPTS = {
@@ -40,8 +43,8 @@ ROLE_PROMPTS = {
 class OpenRouterAI(BaseAIProvider):
     """OpenRouter API implementation for AI chat."""
     
-    async def generate_response(self, user_id: int, history: List[Dict[str, str]], new_message: str, grammar_level: str = "Intermediate", bot_mode: str = "Casual") -> str:
-        """Generate an AI response based on history and new message."""
+    async def generate_response(self, user_id: int, history: List[Dict[str, str]], new_message: str, grammar_level: str = "Intermediate", bot_mode: str = "Casual") -> Dict[str, str]:
+        """Generate an AI response based on history and new message. Returns structured JSON dict."""
         if not config.OPENROUTER_API_KEY or config.OPENROUTER_API_KEY.startswith("your_"):
              logger.warning("OpenRouter API key is not configured!")
              return "It looks like my AI core is currently sleeping. Please tell the admin to configure the API key."
@@ -61,11 +64,35 @@ class OpenRouterAI(BaseAIProvider):
             response = await CLIENT.chat.completions.create(
                 model=DEFAULT_MODEL,
                 messages=messages,
-                max_tokens=250,
+                max_tokens=300,
                 temperature=0.7
             )
-            reply = response.choices[0].message.content
-            return reply.strip()
+            reply = response.choices[0].message.content.strip()
+            
+            import json
+            if reply.startswith("```json"):
+                reply = reply[7:-3].strip()
+            elif reply.startswith("```"):
+                reply = reply[3:-3].strip()
+                
+            try:
+                data = json.loads(reply)
+                return {
+                    "correction_short": data.get("correction_short", ""),
+                    "explanation": data.get("explanation", ""),
+                    "english_reply": data.get("english_reply", reply)
+                }
+            except json.JSONDecodeError:
+                return {
+                    "correction_short": "",
+                    "explanation": "",
+                    "english_reply": reply
+                }
+                
         except Exception as e:
             logger.error(f"OpenRouter API error: {e}")
-            return f"I'm having a little trouble thinking of what to say right now.\n\n(Debug Error: {str(e)})"
+            return {
+                "correction_short": "",
+                "explanation": "",
+                "english_reply": f"I'm having a little trouble thinking of what to say right now.\n\n(Debug Error: {str(e)})"
+            }

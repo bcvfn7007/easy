@@ -51,6 +51,12 @@ async def init_db():
             )
         ''')
         
+        try:
+            await db.execute("ALTER TABLE messages ADD COLUMN explanation TEXT")
+            await db.execute("ALTER TABLE messages ADD COLUMN english_text TEXT")
+        except aiosqlite.OperationalError:
+            pass # Columns already exist
+        
         await db.execute('''
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,

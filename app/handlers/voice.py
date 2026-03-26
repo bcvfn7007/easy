@@ -12,15 +12,7 @@ from app.database.db import get_db
 logger = setup_logger("voice_handlers")
 
 def extract_conversational_text(full_text: str) -> str:
-    """Removes the correction blocks so the TTS only reads the conversational part."""
-    lines = full_text.split('\n')
-    tts_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith(('❌', '✅', '💡')):
-            continue
-        tts_lines.append(line)
-    return '\n'.join(tts_lines).strip()
+    pass # Deprecated by JSON structured payloads
 
 async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -67,12 +59,25 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # Step 2: AI Response
     grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
     bot_mode = await models.get_user_setting(user_id, "bot_mode", "Casual")
-    ai_reply = await ai_service.generate_response(user_id, history, transcription, grammar_level, bot_mode)
     
-    ai_reply += wpm_msg
+    ai_reply_dict = await ai_service.generate_response(user_id, history, transcription, grammar_level, bot_mode)
+    correction = ai_reply_dict.get("correction_short", "")
+    explanation = ai_reply_dict.get("explanation", "")
+    english_reply = ai_reply_dict.get("english_reply", "")
     
-    # Save bot reply and get msg_id for the Show Text button lookup
-    msg_id = await models.add_message_to_history(user_id, 'assistant', ai_reply)
+    # Append WPM to the text that the user reads, but not what is sent to TTS
+    display_english_reply = english_reply + wpm_msg
+    
+    msg_id = await models.add_message_to_history(
+        user_id, 'assistant', 
+        correction or "Perfect", 
+        explanation, 
+        english_reply
+    )
+
+    if correction:
+        keyboard = [[InlineKeyboardButton("Объяснить 📋", callback_data=f"explain_{msg_id}")]]
+        await update.message.reply_text(correction, reply_markup=InlineKeyboardMarkup(keyboard))
 
     # Check trial and pro status
     trial_active = await models.is_trial_active(user_id)
@@ -80,10 +85,8 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Step 3: Generate TTS
     if is_pro or trial_active:
-        # Only TTS the natural English conversational text!
-        tts_text = extract_conversational_text(ai_reply)
-        if not tts_text:
-            tts_text = "Keep up the great work! Let's continue practicing."
+        # Generate TTS strictly from the english string
+        tts_text = english_reply if english_reply else "Keep up the great work! Let's continue practicing."
             
         tts_audio_path = await tts_service.generate_speech(tts_text, user_id, "en")  # Hardware enforced to 'en'
         
@@ -99,39 +102,58 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
             finally:
                 await cleanup_audio_file(tts_audio_path)
         else:
-            await update.message.reply_text(ai_reply)
+            await update.message.reply_text(display_english_reply)
     else:
         # Fallback to Text for expired free users
         keyboard = [[InlineKeyboardButton("⭐ Upgrade to PRO to hear voice", callback_data="buy_pro")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        msg_text = f"*(Trial Expired: Voice Replies Disabled)*\n\n{ai_reply}"
+        msg_text = f"*(Trial Expired: Voice Replies Disabled)*\n\n{display_english_reply}"
         await update.message.reply_text(msg_text, reply_markup=reply_markup, parse_mode="Markdown")
 
-async def get_message_content_by_id(msg_id: int) -> str:
-    """Helper to fetch exact ai completion from DB for the Show Text button."""
+async def get_message_content_by_id(msg_id: int) -> dict:
+    """Helper to fetch message components from DB."""
     async with get_db() as db:
-        async with db.execute("SELECT content FROM messages WHERE id = ?", (msg_id,)) as cursor:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT content, explanation, english_text FROM messages WHERE id = ?", (msg_id,)) as cursor:
             row = await cursor.fetchone()
-            return row[0] if row else "Message not found."
+            return dict(row) if row else None
 
 async def show_text_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles callback for 'Show Text' button on voice messages."""
+    """Handles callback for 'Show Text' and 'Explain' buttons."""
     query = update.callback_query
     await query.answer()
     
     data = query.data
+    try:
+        if data.startswith("show_txt_"):
+            msg_id = int(data.replace("show_txt_", ""))
+        elif data.startswith("explain_"):
+            msg_id = int(data.replace("explain_", ""))
+            
+        msg_data = await get_message_content_by_id(msg_id)
+    except Exception:
+        return
+        
+    if not msg_data:
+        return await context.bot.send_message(chat_id=update.effective_chat.id, text="Message expired from database.")
+        
     if data.startswith("show_txt_"):
         try:
-            msg_id = int(data.replace("show_txt_", ""))
-            content = await get_message_content_by_id(msg_id)
-            
+            english_text = msg_data.get('english_text', '') or msg_data.get('content', '')
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=content,
+                text=english_text,
                 reply_to_message_id=query.message.message_id
             )
-            # Remove the button so they don't click it again
             await query.edit_message_reply_markup(reply_markup=None)
         except Exception as e:
             logger.error(f"Callback error: {e}")
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Could not retrieve transcript.")
+            
+    elif data.startswith("explain_"):
+        explanation = msg_data.get('explanation', '')
+        if explanation:
+            new_text = f"{query.message.text}\n\n*Объяснение:*\n{explanation}"
+            try:
+                await query.edit_message_text(new_text, parse_mode="Markdown")
+            except Exception as e:
+                logger.error(f"Explanation edit error: {e}")
