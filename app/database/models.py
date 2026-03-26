@@ -70,7 +70,7 @@ async def get_message_history(user_id: int, limit: int = 10) -> List[Dict[str, s
             return [{"role": row["role"], "content": row["content"]} for row in reversed(rows)]
 
 async def set_global_setting(key: str, value: str) -> None:
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute('''
             INSERT INTO settings (key, value) VALUES (?, ?)
             ON CONFLICT(key) DO UPDATE SET value = excluded.value
@@ -78,7 +78,7 @@ async def set_global_setting(key: str, value: str) -> None:
         await db.commit()
 
 async def get_global_setting(key: str, default: str = None) -> Optional[str]:
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute("SELECT value FROM settings WHERE key = ?", (key,)) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else default
