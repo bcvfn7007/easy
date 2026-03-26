@@ -8,7 +8,7 @@ from app.database.db import init_db
 from app.utils.logger import setup_logger
 from app.handlers import (
     start_command, help_command, handle_text_message,
-    handle_voice_message, show_text_callback,
+    handle_voice_message,
     settings_command, settings_callbacks,
     send_invoice_callback, precheckout_callback, successful_payment_callback
 )
@@ -54,7 +54,6 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
     
     # Callback Handlers
-    application.add_handler(CallbackQueryHandler(show_text_callback, pattern=r"^show_txt_.*"))
     application.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^admin_.*"))
     application.add_handler(CallbackQueryHandler(settings_callbacks, pattern=r"^(set_lang_|set_grammar_|settings_.*)"))
     application.add_handler(CallbackQueryHandler(send_invoice_callback, pattern=r"^buy_pro$"))

@@ -37,13 +37,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the /help command."""
     help_text = (
-        "📚 *Easy English Help*\n\n"
-        "*Core Features:*\n"
-        "• *Text Chat:* Just send me a message in English or your native language. I will correct you and reply in English.\n"
-        "• *Voice Chat:* Send me a voice message! I will listen, correct your grammar, and send a voice reply back to you.\n\n"
-        "*Commands:*\n"
-        "/start - Restart the bot and see the welcome message\n"
-        "/help - Show this help menu\n\n"
+        "📚 *Easy English Tutor - Help Guide*\n\n"
+        "💡 *How to use me:*\n"
+        "• *Text Chat:* Send me a message! I will correct any mistakes you make, explain the grammar rule in your native language, and reply back in English.\n"
+        "• *Voice Chat:* Send me a voice note! I will listen, transcribe, and correct you via a text message, followed instantly by a pure English voice note to train your listening skills.\n\n"
+        "⚙️ *Settings & Customization (Use /settings):*\n"
+        "• *Grammar Level:* Adjust how strictly I correct you (Beginner, Intermediate, Advanced).\n"
+        "• *My Profile:* Track your learning progress, message counts, and trial status.\n\n"
+        "👑 *Trial & PRO:*\n"
+        "You get a *15-day full-access free trial*! After that, you can upgrade to PRO using Telegram Stars (10 ⭐) for unlimited voice and AI features.\n\n"
+        "*Useful Commands:*\n"
+        "/start - Restart the bot\n"
+        "/help - Show this guide\n"
+        "/settings - Open the interactive settings panel\n\n"
         "_Tip: Don't be afraid to make mistakes. That's how we learn!_"
     )
     await update.message.reply_text(help_text, parse_mode="Markdown")

@@ -5,11 +5,8 @@ from app.utils.logger import setup_logger
 
 logger = setup_logger("settings_handlers")
 
-def get_settings_keyboard(lang: str, grammar_level: str, is_pro: bool) -> InlineKeyboardMarkup:
+def get_settings_keyboard(grammar_level: str, is_pro: bool) -> InlineKeyboardMarkup:
     """Generates the inline keyboard for settings."""
-    next_lang = "ru" if lang == "auto" else ("en" if lang == "ru" else "auto")
-    lang_display = "Auto" if lang == "auto" else ("Русский" if lang == "ru" else "English")
-    
     grammar_levels = ["Beginner", "Intermediate", "Advanced"]
     try:
         current_idx = grammar_levels.index(grammar_level)
@@ -19,10 +16,7 @@ def get_settings_keyboard(lang: str, grammar_level: str, is_pro: bool) -> Inline
     
     keyboard = [
         [InlineKeyboardButton("👤 My Profile", callback_data="settings_profile")],
-        [
-            InlineKeyboardButton(f"🗣 Voice: {lang_display}", callback_data=f"set_lang_{next_lang}"),
-            InlineKeyboardButton(f"📚 Grammar: {grammar_level}", callback_data=f"set_grammar_{next_grammar}")
-        ]
+        [InlineKeyboardButton(f"📚 Grammar Level: {grammar_level}", callback_data=f"set_grammar_{next_grammar}")]
     ]
     
     if not is_pro:
@@ -39,7 +33,6 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Please use /start to initialize your account first.")
         
     is_pro = bool(user.get("is_pro"))
-    lang = await models.get_user_setting(user_id, "tts_language", "auto")
     grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
     trial_active = await models.is_trial_active(user_id)
     
@@ -55,7 +48,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(
         msg, 
-        reply_markup=get_settings_keyboard(lang, grammar_level, is_pro),
+        reply_markup=get_settings_keyboard(grammar_level, is_pro),
         parse_mode="Markdown"
     )
 
@@ -69,12 +62,8 @@ async def settings_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     user = await models.get_user(user_id)
     is_pro = bool(user.get("is_pro")) if user else False
-    
-    if data.startswith("set_lang_"):
-        new_lang = data.split("_", 2)[2]
-        await models.set_user_setting(user_id, "tts_language", new_lang)
         
-    elif data.startswith("set_grammar_"):
+    if data.startswith("set_grammar_"):
         new_grammar = data.split("_", 2)[2]
         await models.set_user_setting(user_id, "grammar_level", new_grammar)
         await models.update_user_grammar_level(user_id, new_grammar)
@@ -102,7 +91,6 @@ async def settings_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
         pass 
 
     # Re-render settings
-    lang = await models.get_user_setting(user_id, "tts_language", "auto")
     grammar_level = await models.get_user_setting(user_id, "grammar_level", "Intermediate")
     trial_active = await models.is_trial_active(user_id)
     
@@ -119,7 +107,7 @@ async def settings_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         await query.edit_message_text(
             msg, 
-            reply_markup=get_settings_keyboard(lang, grammar_level, is_pro),
+            reply_markup=get_settings_keyboard(grammar_level, is_pro),
             parse_mode="Markdown"
         )
     except Exception:
