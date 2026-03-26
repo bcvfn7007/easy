@@ -48,11 +48,11 @@ async def update_user_feature(user_id: int, feature: str, value: int) -> None:
         await db.execute(f"UPDATE users SET {feature} = ? WHERE user_id = ?", (value, user_id))
         await db.commit()
 
-async def add_message_to_history(user_id: int, role: str, content: str) -> int:
+async def add_message_to_history(user_id: int, role: str, content: str, explanation: str = None, english_text: str = None) -> int:
     async with get_db() as db:
         cursor = await db.execute(
-            "INSERT INTO messages (user_id, role, content) VALUES (?, ?, ?)",
-            (user_id, role, content)
+            "INSERT INTO messages (user_id, role, content, explanation, english_text) VALUES (?, ?, ?, ?, ?)",
+            (user_id, role, content, explanation, english_text)
         )
         await db.commit()
         return cursor.lastrowid
@@ -62,12 +62,18 @@ async def get_message_history(user_id: int, limit: int = 10) -> List[Dict[str, s
     async with get_db() as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT role, content FROM messages WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?",
+            "SELECT role, content, english_text FROM messages WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?",
             (user_id, limit)
         ) as cursor:
             rows = await cursor.fetchall()
-            # Return in chronological order
-            return [{"role": row["role"], "content": row["content"]} for row in reversed(rows)]
+            history = []
+            for row in reversed(rows):
+                if row["role"] == "assistant" and row["english_text"]:
+                    content = row["english_text"]
+                else:
+                    content = row["content"]
+                history.append({"role": row["role"], "content": content})
+            return history
 
 async def set_global_setting(key: str, value: str) -> None:
     async with get_db() as db:
