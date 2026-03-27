@@ -65,14 +65,14 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     explanation = ai_reply_dict.get("explanation", "")
     english_reply = ai_reply_dict.get("english_reply", "")
     
-    # Append WPM to the text that the user reads, but not what is sent to TTS
-    display_english_reply = english_reply + wpm_msg
+    # Append WPM to the text that the user reads in the Callback (Not what is sent to TTS)
+    english_reply_with_wpm = f"{english_reply}\n\n🗣️ *Speaking Fluency:* {wpm} WPM"
     
     msg_id = await models.add_message_to_history(
         user_id, 'assistant', 
         correction or "Perfect", 
         explanation, 
-        english_reply
+        english_reply_with_wpm
     )
 
     if correction:
@@ -102,12 +102,12 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
             finally:
                 await cleanup_audio_file(tts_audio_path)
         else:
-            await update.message.reply_text(display_english_reply)
+            await update.message.reply_text(english_reply_with_wpm)
     else:
         # Fallback to Text for expired free users
         keyboard = [[InlineKeyboardButton("⭐ Upgrade to PRO to hear voice", callback_data="buy_pro")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        msg_text = f"*(Trial Expired: Voice Replies Disabled)*\n\n{display_english_reply}"
+        msg_text = f"*(Trial Expired: Voice Replies Disabled)*\n\n{english_reply_with_wpm}"
         await update.message.reply_text(msg_text, reply_markup=reply_markup, parse_mode="Markdown")
 
 async def get_message_content_by_id(msg_id: int) -> dict:
